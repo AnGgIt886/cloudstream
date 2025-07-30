@@ -45,13 +45,20 @@ android {
     }
 
     signingConfigs {
-        if (prereleaseStoreFile != null) {
+        val keystoreFile = prereleaseStoreFile ?: file("../platform_keystore.p12")
+        if (keystoreFile.exists()) {
             create("prerelease") {
-                storeFile = file(prereleaseStoreFile)
-                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
-                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+                storeFile = keystoreFile
+                storePassword = "password"
+                keyAlias = "release"
+                keyPassword = "password"
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
             }
+        } else {
+            logger.warn("Keystore file not found at: ${keystoreFile.absolutePath}")
         }
     }
 
@@ -63,6 +70,12 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 66
         versionName = "4.5.4"
+
+        splits.abi {
+            isEnable = true
+            include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            isUniversalApk = true
+        }
 
         resValue("string", "app_version", "${defaultConfig.versionName}${versionNameSuffix ?: ""}")
         resValue("string", "commit_hash", getGitCommitHash())
@@ -143,6 +156,26 @@ android {
 
     buildFeatures {
         buildConfig = true
+    }
+
+    applicationVariants.all {
+        val versionCodes = mapOf(
+            "armeabi-v7a" to 4,
+            "arm64-v8a" to 4,
+            "x86" to 4,
+            "x86_64" to 4,
+            "universal" to 4
+        )
+
+        outputs.forEach { output ->
+            (output as com.android.build.gradle.internal.api.ApkVariantOutputImpl).apply {
+                val abi = getFilter("ABI") ?: "universal"
+                outputFileName = "Neko-ray_${versionName}_$abi.apk"
+                if (abi in versionCodes) {
+                    versionCodeOverride = 1000000 + versionCode
+                }
+            }
+        }
     }
 
     namespace = "com.lagradost.cloudstream3"
